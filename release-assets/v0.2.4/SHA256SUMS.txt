@@ -1,0 +1,1 @@
+f831eca5eba4ae651dbf169e405578d73e898bfcf0fcdb5deae5a46f2f168900  MemoryBar-0.2.4-macOS-arm64.zip
