@@ -1,0 +1,73 @@
+name: Publish verified MemoryBar 0.2.4
+on:
+  push:
+    branches: [main]
+    paths: [release-assets/v0.2.4/READY]
+permissions: {}
+concurrency:
+  group: memorybar-release-v0.2.4
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'zakras030997-byte/memorybar' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Verify archive, upload draft assets and publish v0.2.4
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib,json,os,urllib.request,urllib.error,urllib.parse
+          REPO='zakras030997-byte/memorybar'
+          TAG='v0.2.4'
+          TARGET='0e920df37f1b5bf5044d305f2f8039c39c7a5016'
+          EXPECTED='f831eca5eba4ae651dbf169e405578d73e898bfcf0fcdb5deae5a46f2f168900'
+          ZIP='MemoryBar-0.2.4-macOS-arm64.zip'
+          assert os.environ['GITHUB_REPOSITORY']==REPO
+          source='https://raw.githubusercontent.com/'+REPO+'/'+os.environ['GITHUB_SHA']+'/release-assets/v0.2.4/'
+          def read_public(name):
+              with urllib.request.urlopen(source+name,timeout=60) as r:return r.read()
+          package=read_public(ZIP)
+          assert hashlib.sha256(package).hexdigest()==EXPECTED
+          checksum=read_public('SHA256SUMS.txt')
+          assert checksum.decode().strip()==EXPECTED+'  '+ZIP
+          meta=json.loads(read_public('release-publication.json'))
+          assert meta['tag_name']==TAG and meta['target_commitish']==TARGET
+          api='https://api.github.com/repos/'+REPO
+          headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'MemoryBar-release-publisher'}
+          def request(url,method='GET',body=None,kind='application/json'):
+              data=json.dumps(body).encode() if isinstance(body,dict) else body
+              h={**headers,'Content-Type':kind}
+              req=urllib.request.Request(url,data=data,headers=h,method=method)
+              with urllib.request.urlopen(req,timeout=90) as r:return json.load(r)
+          releases=request(api+'/releases?per_page=100')
+          found=[r for r in releases if r['tag_name']==TAG]
+          assert len(found)<=1
+          if found:
+              release=found[0]
+              assert release['target_commitish']==TARGET,'Existing release has another source commit'
+          else:
+              release=request(api+'/releases','POST',{k:meta[k] for k in ['tag_name','target_commitish','name','body']}|{'draft':True,'prerelease':False})
+          assets={a['name']:a for a in request(release['assets_url'])}
+          for name,data,kind in [(ZIP,package,'application/zip'),('SHA256SUMS.txt',checksum,'text/plain')]:
+              expected='sha256:'+hashlib.sha256(data).hexdigest()
+              if name in assets:
+                  a=assets[name]
+                  assert a['size']==len(data) and a.get('digest')==expected,'Existing asset differs; refusing to overwrite'
+                  continue
+              assert release['draft'],'Cannot add missing assets to an already published release'
+              upload=release['upload_url'].split('{')[0]
+              assert urllib.parse.urlsplit(upload).netloc=='uploads.github.com'
+              a=request(upload+'?name='+urllib.parse.quote(name),'POST',data,kind)
+              assert a['state']=='uploaded' and a['size']==len(data) and a.get('digest')==expected
+              print('Uploaded:',name,'SHA256 verified')
+          if release['draft']:
+              release=request(release['url'],'PATCH',{'draft':False,'make_latest':'true'})
+          assert not release['draft']
+          print('Published:',release['html_url'])
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('Published ['+TAG+']('+release['html_url']+'). Both release assets verified by SHA-256.\n')
+          PYTHON
