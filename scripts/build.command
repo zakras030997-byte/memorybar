@@ -6,7 +6,7 @@ mb_sdk_path="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
 if [[ -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ]]; then
   mb_sdk_path=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
 fi
-mb_output="${mb_source}/build/Мониторинг RAM.app"
+mb_output="${mb_source}/build/Мониторинг Mac.app"
 if [[ -e "$mb_output" ]]; then print 'Папка build уже содержит приложение. Сохраните или переместите её перед новой сборкой.'; exit 1; fi
 mb_temp="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/memorybar-build.XXXXXX")"
 trap '/bin/rm -rf -- "$mb_temp"' EXIT

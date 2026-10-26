@@ -547,7 +547,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.onUpdate = { [weak self] in self?.updateStatus() }
         updateStatus()
         monitor.start()
-        if CommandLine.arguments.contains("--show") { show() }
+        show()
     }
     @objc func toggle() {
         if panel.isVisible { panel.orderOut(nil) } else { show() }
@@ -603,7 +603,8 @@ if CommandLine.arguments.contains("--self-test") {
 }
 let app = NSApplication.shared
 if !NSRunningApplication.runningApplications(withBundleIdentifier: "ai.anodhas.MemoryBar").filter({ $0.processIdentifier != getpid() }).isEmpty {
-    if let other = NSRunningApplication.runningApplications(withBundleIdentifier: "ai.anodhas.MemoryBar").first(where: { $0.processIdentifier != getpid() }) { other.activate(options: []) }
+    if let other = NSRunningApplication.runningApplications(withBundleIdentifier: "ai.anodhas.MemoryBar").first(where: { $0.processIdentifier != getpid() }) { other.activate(options: [])
+        NSWorkspace.shared.open(URL(string: "memorybar://show")!) }
     exit(0)
 }
 let delegate = AppDelegate()
